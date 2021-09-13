@@ -32,7 +32,7 @@ func (a *API) HTTPUpload(c *gin.Context) {
 		return
 	}
 	currentSnapshot := payload.ToSnapshot()
-	err = a.upload(ctx, currentSnapshot, data, payload.SkipRules, payload.DryRun)
+	err = a.upload(ctx, currentSnapshot, data, payload.Merge, payload.SkipRules, payload.DryRun)
 	if err != nil {
 		c.Error(err)
 		return
@@ -51,7 +51,7 @@ func (a *API) UploadDescriptor(ctx context.Context, req *stencilv1.UploadDescrip
 		res.Errors = err.Error()
 		return res, status.Error(codes.InvalidArgument, err.Error())
 	}
-	if err := a.upload(ctx, s, req.Data, toRulesList(req.Checks), req.Dryrun); err != nil {
+	if err := a.upload(ctx, s, req.Data, false, toRulesList(req.Checks), req.Dryrun); err != nil {
 		res.Errors = err.Error()
 		return res, err
 	}
@@ -59,19 +59,25 @@ func (a *API) UploadDescriptor(ctx context.Context, req *stencilv1.UploadDescrip
 	return res, nil
 }
 
-func (a *API) upload(ctx context.Context, snapshot *snapshot.Snapshot, data []byte, skipRules []string, dryrun bool) error {
+func (a *API) upload(ctx context.Context, snapshot *snapshot.Snapshot, data []byte, merge bool, skipRules []string, dryrun bool) error {
 	if ok := a.Metadata.Exists(ctx, snapshot); ok {
 		return status.Error(codes.AlreadyExists, "Resource already exists")
 	}
-	err := a.Store.Validate(ctx, snapshot, data, skipRules)
-	if err != nil {
-		return status.Error(codes.InvalidArgument, err.Error())
+	if merge {
+		var err error
+		data, err = a.Store.Merge(ctx, snapshot, data, skipRules)
+		if err != nil {
+			return status.Error(codes.InvalidArgument, err.Error())
+		}
+	} else {
+		if err := a.Store.Validate(ctx, snapshot, data, skipRules); err != nil {
+			return status.Error(codes.InvalidArgument, err.Error())
+		}
 	}
 	if dryrun {
 		return nil
 	}
-	err = a.Store.Insert(ctx, snapshot, data)
-	if err != nil {
+	if 	err := a.Store.Insert(ctx, snapshot, data); err != nil {
 		return status.Error(codes.Internal, err.Error())
 	}
 	return nil

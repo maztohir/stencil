@@ -32,6 +32,7 @@ type DescriptorUploadRequest struct {
 	Name      string                `form:"name" binding:"required"`
 	Version   string                `form:"version" binding:"required,version"`
 	File      *multipart.FileHeader `form:"file" binding:"required"`
+	Merge	  bool					`form:"merge"`
 	Latest    bool                  `form:"latest"`
 	SkipRules []string              `form:"skiprules"`
 	DryRun    bool                  `form:"dryrun"`
